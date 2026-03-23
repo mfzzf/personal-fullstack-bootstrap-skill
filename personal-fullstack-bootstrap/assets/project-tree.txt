@@ -1,0 +1,29 @@
+.
+├── api/
+│   └── openapi.yaml
+├── apps/
+│   ├── api/
+│   │   ├── cmd/server/main.go
+│   │   ├── internal/domain/
+│   │   ├── internal/application/
+│   │   ├── internal/interfaces/http/generated/
+│   │   ├── internal/interfaces/http/handlers/
+│   │   ├── internal/interfaces/http/mapper/
+│   │   ├── internal/interfaces/http/router/
+│   │   ├── internal/infrastructure/config/
+│   │   ├── internal/infrastructure/persistence/postgres/
+│   │   ├── Dockerfile
+│   │   ├── go.mod
+│   │   └── Makefile
+│   └── web/
+│       ├── src/app/
+│       ├── src/components/
+│       ├── src/features/
+│       ├── src/lib/api/generated/
+│       ├── src/styles/
+│       ├── Dockerfile
+│       ├── package.json
+│       └── components.json
+├── db/
+│   └── migrations/
+└── docker-compose.yml

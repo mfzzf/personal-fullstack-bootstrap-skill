@@ -1,4 +1,4 @@
-# go-nextjs-fullstack-ddd-skill
+# personal-fullstack-bootstrap-skill
 
 Claude Code skill for the author's default personal full-stack stack.
 
@@ -29,9 +29,9 @@ This repository is designed so the skill is easier to auto-trigger for project b
 
 ## Included Skill
 
-- `go-nextjs-fullstack-ddd/`
-- Packaged zip: `go-nextjs-fullstack-ddd.zip`
+- `personal-fullstack-bootstrap/`
+- Packaged zip: `personal-fullstack-bootstrap.zip`
 
 ## Install
 
-Copy the `go-nextjs-fullstack-ddd/` directory into your Claude skills directory, or use the packaged zip from the GitHub release assets.
+Copy the `personal-fullstack-bootstrap/` directory into your Claude skills directory, or use the packaged zip from the GitHub release assets.
