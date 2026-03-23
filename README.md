@@ -1,6 +1,17 @@
 # go-nextjs-fullstack-ddd-skill
 
-Production-ready Claude Code skill for building full-stack applications with:
+Claude Code skill for the author's default personal full-stack stack.
+
+This skill is meant to trigger at the very beginning of a new project when the user asks for things like:
+
+- build a ChatGPT-like app
+- build a SaaS product
+- build an admin panel or dashboard
+- build an AI product
+- scaffold a full-stack app
+- start a new web platform from scratch
+
+## Default Stack
 
 - Go backend
 - Next.js + shadcn/ui frontend
@@ -11,6 +22,10 @@ Production-ready Claude Code skill for building full-stack applications with:
 - OpenAPI-first contract design
 - Generated Go server contracts and Next.js TypeScript client
 - Premium frontend quality with `frontend-design` then `ui-ux-pro-max`
+
+## Triggering Intent
+
+This repository is designed so the skill is easier to auto-trigger for project bootstrap requests where the user wants the author's standard stack without restating it every time.
 
 ## Included Skill
 

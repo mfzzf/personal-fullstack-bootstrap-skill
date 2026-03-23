@@ -1,22 +1,46 @@
 ---
-name: go-nextjs-fullstack-ddd
-description: This skill should be used when building or refactoring production-grade full-stack applications with a Go backend, a Next.js plus shadcn/ui frontend, shadcn MCP-assisted component selection, PostgreSQL, Docker Compose startup, DDD structure, and OpenAPI-driven code generation for both server and client code.
+name: personal-fullstack-bootstrap
+description: This skill should be used at the start of new product or application builds when the user wants Claude to default to the author's personal stack: Go backend, Next.js plus shadcn/ui frontend, shadcn MCP-assisted UI composition, PostgreSQL, Docker Compose startup, DDD structure, and OpenAPI-driven code generation. Trigger on requests like build a SaaS, build a ChatGPT-like app, build an admin system, build an AI product, scaffold a full-stack app, or start a new web platform.
 ---
 
-# Go Nextjs Fullstack Ddd
+# Personal Fullstack Bootstrap
 
 ## Overview
 
-Build production-grade full-stack systems with Go, Next.js, shadcn/ui, PostgreSQL, Docker Compose, and OpenAPI as the contract source of truth. Keep backend architecture DDD-first, keep frontend quality premium, and generate transport and client code from one OpenAPI YAML file that stays under 500 lines.
+Use this as the default personal full-stack stack when a project is just starting and the user asks to build a new system, product, SaaS, dashboard, admin panel, AI app, or ChatGPT-like application. Build with Go, Next.js, shadcn/ui, PostgreSQL, Docker Compose, and OpenAPI as the contract source of truth while keeping the backend DDD-first and the frontend premium and production-grade.
 
 ## Use This Skill When
 
-Use this skill for requests such as:
-- Build a new SaaS app with Go, Next.js, PostgreSQL, and Docker Compose.
-- Scaffold a production-ready full-stack starter with DDD and OpenAPI.
-- Add a new bounded context that needs generated Go server contracts and a generated Next.js client.
-- Refactor a generic monorepo into a contract-first stack with better frontend quality.
-- Create an internal tool or customer-facing dashboard that must look premium instead of scaffold-grade.
+Use this skill immediately at project bootstrap for requests such as:
+- Build a new ChatGPT-like full-stack system.
+- Build a new SaaS product from scratch.
+- Build an admin system, internal tool, dashboard, CRM, or AI platform.
+- Scaffold a production-ready full-stack starter using my default tech stack.
+- Start a new web product and choose the backend, frontend, database, and project structure for me.
+- Refactor an early generic scaffold into my standard Go plus Next.js DDD stack.
+
+## Trigger Intent
+
+Treat this skill as the default starting point for the author's personal technology stack.
+
+Trigger proactively when the user is asking to create a brand new system and does not explicitly override the stack, especially for prompts involving:
+- chat app
+- ChatGPT clone
+- AI app
+- AI SaaS
+- admin panel
+- dashboard
+- CRM
+- CMS
+- internal tool
+- platform
+- web app
+- full-stack system
+- full-stack project
+- full-stack product
+- scaffold a project
+- start a project
+- build from scratch
 
 ## Non-Negotiables
 
@@ -137,6 +161,7 @@ Use `assets/docker-compose.template.yaml` as the starting point when scaffolding
 
 ## Example Requests
 
+- Build a production-grade ChatGPT-like app with streaming chat, auth, billing, and admin tools using my default stack.
 - Build a production-grade project management app with Go, Next.js, PostgreSQL, Docker Compose, and OpenAPI-first code generation.
 - Scaffold a DDD monorepo with a Go API, Next.js admin app, shadcn/ui, and one command startup.
 - Add a billing bounded context with a single OpenAPI YAML file under 500 lines and generated Go plus TypeScript clients.
