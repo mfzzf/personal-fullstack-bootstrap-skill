@@ -1,37 +1,56 @@
-# personal-fullstack-bootstrap-skill
+# personal-fullstack-bootstrap
 
-Claude Code skill for the author's default personal full-stack stack.
+Claude Code skill for bootstrapping full-stack applications with Go + Next.js + PostgreSQL + Docker Compose.
 
-This skill is meant to trigger at the very beginning of a new project when the user asks for things like:
+## When to Use
 
-- build a ChatGPT-like app
-- build a SaaS product
-- build an admin panel or dashboard
-- build an AI product
-- scaffold a full-stack app
-- start a new web platform from scratch
+Triggers at project bootstrap when you ask for things like:
 
-## Default Stack
+- Build a ChatGPT-like app / AI SaaS
+- Build an admin panel, dashboard, or CRM
+- Scaffold a full-stack project from scratch
+- Build a reconciliation platform, billing system, data pipeline
 
-- Go backend
-- Next.js + shadcn/ui frontend
-- shadcn MCP-assisted UI selection
-- PostgreSQL
-- Docker Compose startup with `docker-compose up -d`
-- DDD project structure
-- OpenAPI-first contract design
-- Generated Go server contracts and Next.js TypeScript client
-- Premium frontend quality with `frontend-design` then `ui-ux-pro-max`
+## Stack
 
-## Triggering Intent
+| Layer | Choice |
+|-------|--------|
+| Backend | Go + chi + DDD structure |
+| Frontend | Next.js App Router + shadcn/ui + Tailwind |
+| Database | PostgreSQL |
+| Contract | OpenAPI (`api/openapi.yaml`) |
+| Containers | Docker Compose |
+| Markdown | react-markdown + remark-gfm + @tailwindcss/typography |
+| API Proxy | Runtime catch-all route (never Next.js rewrites) |
 
-This repository is designed so the skill is easier to auto-trigger for project bootstrap requests where the user wants the author's standard stack without restating it every time.
+## Key Patterns (battle-tested)
 
-## Included Skill
+- **Runtime API Proxy** — `src/app/api/[[...path]]/route.ts` reads env at runtime, not build time
+- **SSE Streaming** — Go endpoint with Flusher, timeout, `done` event + event sourcing for replay
+- **EventSource Consumption** — text chunk concatenation, proper cleanup, lazy tab loading
+- **Async Task Processing** — guaranteed finalization via `defer`, scanner error checking
+- **AI Agent Integration** — structured output via tool calls, never free-text parsing
+- **shadcn/ui Fixes** — `createPortal` for overflow clipping, typography plugin for markdown
 
-- `personal-fullstack-bootstrap/`
-- Packaged zip: `personal-fullstack-bootstrap.zip`
+## Structure
+
+```
+SKILL.md              ← main skill definition
+references/
+  architecture-blueprint.md    ← DDD layout, SSE, async tasks, AI agent, deployment
+  frontend-design-playbook.md  ← runtime proxy, EventSource, shadcn pitfalls, async UI
+  openapi-codegen-playbook.md  ← contract rules, generation commands
+assets/
+  api-proxy-route.template.ts  ← Next.js runtime API proxy
+  sse-handler.template.go      ← Go SSE endpoint boilerplate
+  eventsource-hook.template.ts ← React EventSource hook
+  docker-compose.template.yaml ← Docker Compose starter
+  openapi.template.yaml        ← OpenAPI contract starter
+  project-tree.txt             ← Repository layout reference
+scripts/
+  check_openapi_size.py        ← Enforce 500-line OpenAPI limit
+```
 
 ## Install
 
-Copy the `personal-fullstack-bootstrap/` directory into your Claude skills directory, or use the packaged zip from the GitHub release assets.
+Copy this repository into your Claude skills directory, or install as a skill package.
