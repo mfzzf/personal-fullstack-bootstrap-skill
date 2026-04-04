@@ -27,7 +27,13 @@
 │       │   └── client.ts
 │       ├── src/hooks/
 │       ├── src/styles/
-│       ├── next.config.js                    ← just { output: "standalone" }
+│       │   ├── tokens/                      ← 3-tier design tokens
+│       │   │   ├── primitives.css
+│       │   │   ├── semantic.css
+│       │   │   └── components.css
+│       │   └── app.css                      ← @import "tailwindcss" + tokens
+│       ├── next.config.ts                   ← { output: "standalone" }
+│       ├── proxy.ts                         ← auth redirects (replaces middleware.ts)
 │       ├── Dockerfile
 │       ├── package.json
 │       └── components.json

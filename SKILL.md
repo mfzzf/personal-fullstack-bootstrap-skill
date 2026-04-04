@@ -54,10 +54,12 @@ Trigger proactively when the user is asking to create a brand new system and doe
 - Keep generated code out of the domain layer. Treat generated files as transport and client artifacts only.
 - Keep the backend in a clear DDD layout with separate domain, application, interface, and infrastructure concerns.
 - Keep the frontend in Next.js App Router with shadcn/ui primitives customized beyond default shadcn styling.
-- **Never use Next.js `rewrites` in `next.config.js` for API proxying in Docker.** `process.env` in rewrites is evaluated at build time, not runtime. Always use a runtime API proxy route instead. See `assets/api-proxy-route.template.ts`.
+- **Never use Next.js `rewrites` in `next.config.ts` for API proxying in Docker.** `process.env` in rewrites is evaluated at build time, not runtime. Always use a runtime API proxy route instead. See `assets/api-proxy-route.template.ts`.
 - **Dockerfile base image versions must match language versions.** Go Dockerfile `FROM golang:X` must match `go.mod`'s `go X.Y`. Node Dockerfile must match `.nvmrc` or `engines` if present.
 - **Hardcode sensitive or environment-specific vars in `docker-compose.yml`** with explicit string values — user shell environment can silently override `${VAR}` syntax.
 - **Always finalize async tasks.** Any goroutine that sets status to "processing" must guarantee transition to "completed" or "failed" via `defer` or equivalent.
+- Set up `golangci-lint` and write at minimum one integration test (with `testcontainers-go`) per bounded context before moving to frontend implementation.
+- Register `net/http/pprof` on a separate admin port (never the public API port) in every Go service.
 - Use shadcn MCP when available before building complex UI such as tables, forms, dialogs, sheets, command menus, and dashboards.
 - Invoke `frontend-design` first for visual direction and initial component/page implementation when that skill is available.
 - Invoke `ui-ux-pro-max` after `frontend-design` for hierarchy tuning, UX improvements, responsiveness, state coverage, and production polish when that skill is available.
@@ -67,24 +69,28 @@ Trigger proactively when the user is asking to create a brand new system and doe
 Use these defaults unless the repository already standardizes something equivalent:
 - Backend language: Go
 - Backend HTTP layer: `net/http` compatible adapters, preferably `chi`
-- Frontend: Next.js App Router with TypeScript
-- Component system: shadcn/ui plus Tailwind CSS
+- Frontend: Next.js 16 App Router with TypeScript
+- Component system: shadcn/ui (CLI v4) plus Tailwind CSS v4
 - Markdown rendering: `react-markdown` + `remark-gfm` + `@tailwindcss/typography`
 - Database: PostgreSQL
 - Contract: `api/openapi.yaml`
 - Go code generation: prefer `oapi-codegen` for Go contracts in DDD projects, or keep the repository's existing OpenAPI generator if it already exists
 - TypeScript client generation: prefer `openapi-generator-cli` with `typescript-fetch`, or keep the repository's existing OpenAPI TypeScript generator if it already exists
 - Containers: `docker-compose.yml` with `postgres`, `api`, and `web` services
-- API proxy: runtime catch-all route at `src/app/api/[[...path]]/route.ts` (never Next.js rewrites)
+- API proxy: runtime catch-all route at `src/app/api/[[...path]]/route.ts` (never Next.js rewrites). Keep `next.config.ts` as `{ output: "standalone" }` only.
 - Excel handling: `github.com/xuri/excelize/v2` for Go-side reading/writing
 - Observability: OpenTelemetry SDK → OTLP Collector → ClickHouse (via SigNoz or Uptrace)
 - Logging: `log/slog` with JSON handler and trace correlation
 - Database tracing: `otelpgx` for automatic SQL span capture
-- Charts: Apache ECharts (via `echarts-for-react`) for data-heavy UIs, or Tremor for shadcn-native
-- Motion: `framer-motion` for functional transitions (page, list, toast)
+- Charts: Apache ECharts 6 (via `echarts-for-react`) for data-heavy UIs, or shadcn built-in Chart component (Recharts v3) for dashboards
+- Motion: `motion` (`motion/react`) for functional transitions (page, list, toast)
 - Middleware: chi middleware chain (RealIP → RequestID → Logger → Recoverer → CORS → Compress → Timeout → Auth)
 - Circuit breaker: `gobreaker` for external service calls (AI agents, third-party APIs)
 - Query builder: `squirrel` for dynamic filters/sorting/pagination
+- Linting: `golangci-lint` with govet, staticcheck, errcheck, gosec, revive, exhaustive
+- Integration testing: `testcontainers-go` for real PostgreSQL in tests
+- Input validation: `go-playground/validator` for struct tag validation
+- Admin/debug: `net/http/pprof` on separate port for profiling
 
 ## Execution Workflow
 
@@ -123,6 +129,18 @@ Read `references/openapi-codegen-playbook.md` before generating code or choosing
 - Place PostgreSQL repositories, config loading, migrations integration, and external adapters in `internal/infrastructure`.
 - Keep SQL and persistence details out of the domain layer.
 - Keep framework-specific concerns out of application services.
+
+Read `references/architecture-blueprint.md` for main.go wiring pattern, domain error patterns, and DDD guardrails.
+
+### 4b. Set up testing and code quality
+
+- Add `.golangci.yml` at the repo root with the recommended linter set.
+- Write at least one integration test per repository using `testcontainers-go`.
+- Write handler tests using `httptest` for the critical path (create, get, list).
+- Add `goleak.VerifyTestMain` to any package with goroutines.
+- Add Makefile targets: `lint`, `test`, `test-integration`, `generate`, `build`.
+
+Read `references/testing-quality.md` for test patterns, linter config, and Makefile template.
 
 ### 5. Implement the Next.js frontend with premium UI standards
 
@@ -202,9 +220,10 @@ Read `references/performance-production.md` for implementation details and code 
 
 ## Resource Map
 
-- Read `references/architecture-blueprint.md` for the default DDD folder layout, request flow, SSE patterns, and async task processing.
-- Read `references/performance-production.md` for connection pool tuning, graceful shutdown, pagination, observability (OTel + ClickHouse), caching, rate limiting, and N+1 prevention.
-- Read `references/backend-middleware-database.md` for auth middleware, middleware chain ordering, DB indexing, transactions, partitioning, circuit breakers, worker queues, and query builders.
+- Read `references/architecture-blueprint.md` for the default DDD folder layout, request flow, main.go wiring, domain error patterns, SSE patterns, and async task processing.
+- Read `references/testing-quality.md` for table-driven tests, httptest handler testing, testcontainers-go integration tests, goleak, fuzzing, golangci-lint config, and Makefile targets.
+- Read `references/performance-production.md` for connection pool tuning, graceful shutdown, pagination, observability (OTel + ClickHouse), caching, rate limiting, N+1 prevention, pprof endpoints, pool monitoring, and benchmarks.
+- Read `references/backend-middleware-database.md` for auth middleware, middleware chain ordering, input validation, retry with backoff, DB indexing, transactions, partitioning, circuit breakers, worker queues, and query builders.
 - Read `references/frontend-aesthetics-dataviz.md` for motion design, data-dense tables, chart libraries (ECharts/Recharts), dark mode, CJK typography, heat maps, and export patterns.
 - Read `references/openapi-codegen-playbook.md` for contract rules, code generation commands, and placement rules.
 - Read `references/frontend-design-playbook.md` for the required frontend skill chain, premium UI standards, runtime proxy pattern, SSE consumption, and shadcn pitfalls.

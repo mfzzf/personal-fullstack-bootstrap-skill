@@ -294,6 +294,176 @@ CREATE TABLE task_files (
 - **SSE timeout**: Set Go HTTP server `WriteTimeout` to 10+ minutes.
 - **GOPROXY**: Add `GOPROXY=https://goproxy.cn,direct` for builds behind Chinese firewall.
 
+---
+
+## main.go Wiring Pattern
+
+Constructor-based dependency injection. No frameworks (wire is acceptable for large projects, but explicit wiring is clearer at bootstrap).
+
+```go
+func main() {
+    ctx := context.Background()
+
+    // Config
+    cfg := config.Load()
+
+    // Infrastructure
+    pool, err := infrastructure.NewPGPool(ctx, cfg.DatabaseURL)
+    if err != nil {
+        slog.Error("failed to connect to database", "error", err)
+        os.Exit(1)
+    }
+
+    // Run migrations (with advisory lock for multi-instance safety)
+    if err := infrastructure.RunMigrations(pool, "db/migrations"); err != nil {
+        slog.Error("migration failed", "error", err)
+        os.Exit(1)
+    }
+
+    // Repositories (infra implements domain interfaces)
+    taskRepo := postgres.NewTaskRepo(pool)
+    fileRepo := postgres.NewFileRepo(pool)
+
+    // Application services
+    taskService := application.NewTaskService(taskRepo, fileRepo)
+
+    // HTTP handlers
+    taskHandler := handlers.NewTaskHandler(taskService)
+    fileHandler := handlers.NewFileHandler(taskService)
+
+    // Router
+    router := router.New(taskHandler, fileHandler)
+
+    // Server
+    srv := &http.Server{
+        Addr:         ":" + cfg.Port,
+        Handler:      router,
+        ReadTimeout:  15 * time.Second,
+        WriteTimeout: 10 * time.Minute,
+        IdleTimeout:  60 * time.Second,
+    }
+
+    // Start with errgroup for concurrent concerns
+    g, gctx := errgroup.WithContext(ctx)
+
+    // HTTP server
+    g.Go(func() error {
+        slog.Info("server starting", "port", cfg.Port)
+        if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+            return err
+        }
+        return nil
+    })
+
+    // Background workers (if needed)
+    taskQueue := worker.NewTaskQueue(cfg.WorkerCount, taskService.Process)
+    g.Go(func() error {
+        <-gctx.Done()
+        taskQueue.Shutdown()
+        return nil
+    })
+
+    // Graceful shutdown
+    g.Go(func() error {
+        quit := make(chan os.Signal, 1)
+        signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+        select {
+        case <-quit:
+        case <-gctx.Done():
+        }
+        slog.Info("shutting down")
+        shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+        srv.Shutdown(shutdownCtx)
+        pool.Close()
+        return nil
+    })
+
+    if err := g.Wait(); err != nil {
+        slog.Error("server error", "error", err)
+        os.Exit(1)
+    }
+}
+```
+
+**Why explicit wiring**: Every dependency is visible in one place. Startup failures point to the exact line. No magic, no reflection, no framework to learn.
+
+---
+
+## Domain Error Patterns
+
+Errors cross layer boundaries. Each layer must speak its own error language.
+
+### Domain Errors (Sentinel + Typed)
+
+```go
+// internal/domain/task/errors.go
+package task
+
+import "fmt"
+
+// Sentinel errors for errors.Is() checks
+var (
+    ErrNotFound              = &Error{Code: "not_found", Message: "task not found"}
+    ErrConcurrentModification = &Error{Code: "conflict", Message: "task was modified by another request"}
+)
+
+// Typed error for rich context
+type Error struct {
+    Code    string
+    Message string
+    Cause   error
+}
+
+func (e *Error) Error() string {
+    if e.Cause != nil {
+        return fmt.Sprintf("%s: %v", e.Message, e.Cause)
+    }
+    return e.Message
+}
+
+func (e *Error) Unwrap() error { return e.Cause }
+
+func (e *Error) Is(target error) bool {
+    t, ok := target.(*Error)
+    if !ok {
+        return false
+    }
+    return e.Code == t.Code
+}
+
+// Wrap preserves the domain error code while adding cause context
+func (e *Error) Wrap(cause error) *Error {
+    return &Error{Code: e.Code, Message: e.Message, Cause: cause}
+}
+```
+
+### Mapping Domain Errors to HTTP (Interface Layer)
+
+```go
+// internal/interfaces/http/handlers/errors.go
+func mapDomainError(w http.ResponseWriter, err error) {
+    var domErr *domain.Error
+    if !errors.As(err, &domErr) {
+        writeError(w, 500, "internal_error", "unexpected error")
+        return
+    }
+
+    switch domErr.Code {
+    case "not_found":
+        writeError(w, 404, domErr.Code, domErr.Message)
+    case "validation_failed":
+        writeError(w, 422, domErr.Code, domErr.Message)
+    case "conflict":
+        writeError(w, 409, domErr.Code, domErr.Message)
+    default:
+        writeError(w, 500, domErr.Code, domErr.Message)
+    }
+}
+```
+
+**Rule**: Domain layer defines error codes. Application layer wraps with `%w`. Interface layer maps codes to HTTP status. Infrastructure layer wraps database errors into domain errors (`pgx.ErrNoRows` → `ErrNotFound`).
+
 ### Kubernetes
 
 - **RWO volumes**: Use `strategy: Recreate` if PVCs use ReadWriteOnce (only one pod can mount).

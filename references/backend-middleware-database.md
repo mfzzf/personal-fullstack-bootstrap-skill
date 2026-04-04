@@ -164,7 +164,133 @@ ALTER TABLE reconciliation_tasks ADD COLUMN idempotency_key TEXT UNIQUE;
 
 ---
 
-## 6. PostgreSQL Index Strategy
+## 6. Input Validation
+
+Use `go-playground/validator` for struct-level validation. Map errors to the structured error envelope from `performance-production.md`.
+
+```go
+import "github.com/go-playground/validator/v10"
+
+var validate = validator.New()
+
+// Register custom validators once at startup
+func init() {
+    validate.RegisterValidation("task_status", func(fl validator.FieldLevel) bool {
+        s := fl.Field().String()
+        return s == "pending" || s == "processing" || s == "completed" || s == "failed"
+    })
+}
+
+// Request DTO with validation tags
+type CreateTaskRequest struct {
+    Name        string `json:"name" validate:"required,min=1,max=255"`
+    Description string `json:"description" validate:"max=5000"`
+    Priority    int    `json:"priority" validate:"gte=0,lte=10"`
+}
+
+// In handler: validate and map errors
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+    var req CreateTaskRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        writeError(w, 400, "invalid_body", "malformed JSON")
+        return
+    }
+
+    if err := validate.Struct(req); err != nil {
+        details := mapValidationErrors(err.(validator.ValidationErrors))
+        writeErrorWithDetails(w, 422, "validation_failed", "invalid input", details)
+        return
+    }
+    // ...
+}
+
+// Map validator errors to field-level details
+func mapValidationErrors(errs validator.ValidationErrors) []FieldError {
+    out := make([]FieldError, 0, len(errs))
+    for _, e := range errs {
+        out = append(out, FieldError{
+            Field:   toSnakeCase(e.Field()),
+            Message: validationMessage(e),
+        })
+    }
+    return out
+}
+
+type FieldError struct {
+    Field   string `json:"field"`
+    Message string `json:"message"`
+}
+```
+
+**Where to validate**: Interface layer validates shape (required, length, format). Domain layer validates business rules (status transitions, permission checks). Never validate in infrastructure.
+
+---
+
+## 7. Retry with Exponential Backoff
+
+Complement to circuit breaker. Circuit breaker protects against sustained failures; retry handles transient ones (network blips, brief timeouts).
+
+```go
+import (
+    "math"
+    "math/rand"
+    "time"
+)
+
+type RetryConfig struct {
+    MaxAttempts int
+    BaseDelay   time.Duration
+    MaxDelay    time.Duration
+}
+
+var DefaultRetry = RetryConfig{
+    MaxAttempts: 3,
+    BaseDelay:   500 * time.Millisecond,
+    MaxDelay:    10 * time.Second,
+}
+
+func WithRetry[T any](ctx context.Context, cfg RetryConfig, fn func() (T, error)) (T, error) {
+    var lastErr error
+    var zero T
+    for attempt := 0; attempt < cfg.MaxAttempts; attempt++ {
+        result, err := fn()
+        if err == nil {
+            return result, nil
+        }
+        lastErr = err
+
+        if attempt == cfg.MaxAttempts-1 {
+            break
+        }
+
+        // Exponential backoff with jitter
+        delay := time.Duration(float64(cfg.BaseDelay) * math.Pow(2, float64(attempt)))
+        if delay > cfg.MaxDelay {
+            delay = cfg.MaxDelay
+        }
+        jitter := time.Duration(rand.Int63n(int64(delay / 2)))
+        delay = delay + jitter
+
+        select {
+        case <-ctx.Done():
+            return zero, ctx.Err()
+        case <-time.After(delay):
+        }
+    }
+    return zero, fmt.Errorf("after %d attempts: %w", cfg.MaxAttempts, lastErr)
+}
+
+// Usage: retry an external API call
+body, err := WithRetry(ctx, DefaultRetry, func() (io.ReadCloser, error) {
+    return agentClient.Call(ctx, payload)
+})
+```
+
+**When to retry**: Network errors, 502/503/504 responses, connection resets. **When NOT to retry**: 400/401/403/404/422 — these won't succeed on retry.
+
+---
+
+## 8. PostgreSQL Index Strategy
 
 ### Covering Indexes for List Queries
 
@@ -225,7 +351,7 @@ LIMIT 20;
 
 ---
 
-## 7. Database Transaction Patterns
+## 9. Database Transaction Patterns
 
 ### Read-only Transactions
 
@@ -270,7 +396,7 @@ func (r *TaskRepo) Update(ctx context.Context, t *Task) error {
 
 ---
 
-## 8. Time-Series Partitioning
+## 10. Time-Series Partitioning
 
 For tables that grow continuously (events, logs, audit trails), partition by time:
 
@@ -296,7 +422,7 @@ CREATE TABLE task_events_2026_05 PARTITION OF task_events
 
 ---
 
-## 9. Materialized Views for Aggregation
+## 11. Materialized Views for Aggregation
 
 For dashboard stats that don't need real-time accuracy:
 
@@ -331,7 +457,7 @@ go func() {
 
 ---
 
-## 10. External Service Integration
+## 12. External Service Integration
 
 ### Circuit Breaker for AI Agent Calls
 
@@ -382,7 +508,7 @@ var agentClient = &http.Client{
 
 ---
 
-## 11. Worker Queue Pattern
+## 13. Worker Queue Pattern
 
 For production, goroutine-per-task doesn't scale. Use a bounded worker pool:
 
@@ -414,7 +540,7 @@ func (q *TaskQueue) Shutdown()              { close(q.ch); q.wg.Wait() }
 
 ---
 
-## 12. Query Builder vs Raw SQL
+## 14. Query Builder vs Raw SQL
 
 For dynamic queries (filters, sorting, pagination), raw SQL string concatenation is a SQL injection vector. Use a builder:
 

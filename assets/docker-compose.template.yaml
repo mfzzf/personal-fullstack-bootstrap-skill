@@ -32,6 +32,8 @@ services:
       PORT: "8080"
     ports:
       - "8080:8080"
+      # pprof admin port (dev only — do not expose in production)
+      - "6060:6060"
 
   web:
     build:

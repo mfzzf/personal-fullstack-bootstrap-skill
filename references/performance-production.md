@@ -585,3 +585,124 @@ When bootstrapping, implement in this order:
 11. **Caching** — improves latency
 12. **LISTEN/NOTIFY** — replaces SSE polling
 13. **ClickHouse + dashboards** — long-term observability storage
+
+---
+
+## 14. pprof Endpoints
+
+Register `net/http/pprof` on a **separate admin port** — never expose it on the public API.
+
+```go
+import _ "net/http/pprof" // registers handlers on DefaultServeMux
+
+func startAdminServer() {
+    adminMux := http.DefaultServeMux // pprof already registered here
+    adminMux.HandleFunc("/healthz", healthHandler)
+
+    adminSrv := &http.Server{
+        Addr:    ":6060",
+        Handler: adminMux,
+    }
+    go adminSrv.ListenAndServe()
+}
+```
+
+### Profiling Workflow
+
+```bash
+# CPU profile (30 seconds)
+go tool pprof http://localhost:6060/debug/pprof/profile?seconds=30
+
+# Heap (current allocations)
+go tool pprof http://localhost:6060/debug/pprof/heap
+
+# Goroutine dump (find leaks)
+go tool pprof http://localhost:6060/debug/pprof/goroutine
+
+# Generate flame graph (requires graphviz)
+go tool pprof -http=:8090 http://localhost:6060/debug/pprof/profile?seconds=30
+```
+
+**When to profile**: p99 latency spike → CPU profile. Memory growing → heap profile. Goroutine count alert → goroutine profile. Always profile in a staging environment that mirrors production load.
+
+---
+
+## 15. Connection Pool Monitoring
+
+Expose `pgxpool.Stat()` as OTel metrics so you see pool exhaustion before it becomes an outage.
+
+```go
+func monitorPool(pool *pgxpool.Pool, meter metric.Meter) {
+    acquireCount, _ := meter.Int64ObservableGauge("db.pool.acquire_count")
+    totalConns, _ := meter.Int64ObservableGauge("db.pool.total_conns")
+    idleConns, _ := meter.Int64ObservableGauge("db.pool.idle_conns")
+    maxConns, _ := meter.Int64ObservableGauge("db.pool.max_conns")
+
+    meter.RegisterCallback(func(_ context.Context, o metric.Observer) error {
+        stat := pool.Stat()
+        o.ObserveInt64(acquireCount, stat.AcquireCount())
+        o.ObserveInt64(totalConns, int64(stat.TotalConns()))
+        o.ObserveInt64(idleConns, int64(stat.IdleConns()))
+        o.ObserveInt64(maxConns, int64(stat.MaxConns()))
+        return nil
+    }, acquireCount, totalConns, idleConns, maxConns)
+}
+```
+
+**Dashboard query**: `db.pool.total_conns / db.pool.max_conns > 0.8` → alert. This catches connection exhaustion 5-10 minutes before requests start failing.
+
+---
+
+## 16. Benchmark Pattern
+
+Use `testing.B` for hot-path functions. Run before and after optimization to prove improvement.
+
+```go
+func BenchmarkTaskRepo_List(b *testing.B) {
+    pool := setupBenchDB(b) // Shared container, pre-seeded with 10k rows
+    repo := postgres.NewTaskRepo(pool)
+    ctx := context.Background()
+
+    b.ResetTimer()
+    b.ReportAllocs()
+
+    for i := 0; i < b.N; i++ {
+        _, err := repo.List(ctx, nil, 20)
+        if err != nil {
+            b.Fatal(err)
+        }
+    }
+}
+
+// Comparison benchmark: cursor vs offset
+func BenchmarkPagination(b *testing.B) {
+    pool := setupBenchDB(b)
+    repo := postgres.NewTaskRepo(pool)
+    ctx := context.Background()
+
+    b.Run("cursor", func(b *testing.B) {
+        b.ReportAllocs()
+        for i := 0; i < b.N; i++ {
+            repo.ListByCursor(ctx, nil, 20)
+        }
+    })
+
+    b.Run("offset_page_1", func(b *testing.B) {
+        b.ReportAllocs()
+        for i := 0; i < b.N; i++ {
+            repo.ListByOffset(ctx, 0, 20)
+        }
+    })
+
+    b.Run("offset_page_500", func(b *testing.B) {
+        b.ReportAllocs()
+        for i := 0; i < b.N; i++ {
+            repo.ListByOffset(ctx, 10000, 20)
+        }
+    })
+}
+```
+
+Run: `go test -bench=. -benchmem -count=5 ./internal/infrastructure/persistence/postgres/`
+
+**Rule**: Always use `-count=5` or higher to get statistically meaningful results. Use `benchstat` to compare before/after.

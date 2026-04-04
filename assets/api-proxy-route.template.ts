@@ -2,12 +2,16 @@
 //
 // Runtime API proxy — reads INTERNAL_API_BASE_URL at request time, not build time.
 // This replaces Next.js rewrites which bake env vars into the Docker image.
+// Compatible with Next.js 16 route handlers and Turbopack.
 //
 // Usage in docker-compose.yml:
 //   environment:
 //     INTERNAL_API_BASE_URL: http://api:8080
 //
-// Keep next.config.js as: module.exports = { output: "standalone" };
+// Keep next.config.ts as:
+//   import type { NextConfig } from "next";
+//   const config: NextConfig = { output: "standalone" };
+//   export default config;
 
 import { NextRequest, NextResponse } from "next/server";
 
