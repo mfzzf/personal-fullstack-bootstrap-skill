@@ -77,6 +77,14 @@ Use these defaults unless the repository already standardizes something equivale
 - Containers: `docker-compose.yml` with `postgres`, `api`, and `web` services
 - API proxy: runtime catch-all route at `src/app/api/[[...path]]/route.ts` (never Next.js rewrites)
 - Excel handling: `github.com/xuri/excelize/v2` for Go-side reading/writing
+- Observability: OpenTelemetry SDK → OTLP Collector → ClickHouse (via SigNoz or Uptrace)
+- Logging: `log/slog` with JSON handler and trace correlation
+- Database tracing: `otelpgx` for automatic SQL span capture
+- Charts: Apache ECharts (via `echarts-for-react`) for data-heavy UIs, or Tremor for shadcn-native
+- Motion: `framer-motion` for functional transitions (page, list, toast)
+- Middleware: chi middleware chain (RealIP → RequestID → Logger → Recoverer → CORS → Compress → Timeout → Auth)
+- Circuit breaker: `gobreaker` for external service calls (AI agents, third-party APIs)
+- Query builder: `squirrel` for dynamic filters/sorting/pagination
 
 ## Execution Workflow
 
@@ -156,7 +164,24 @@ Use `assets/sse-handler.template.go` and `assets/eventsource-hook.template.ts` a
 
 Use `assets/docker-compose.template.yaml` as the starting point when scaffolding containers from scratch.
 
-### 8. Verify the slice end to end
+### 8. Harden for production
+
+After the slice works end-to-end, apply production patterns in priority order:
+
+- Tune connection pool (MaxConns, idle timeout, lifetime).
+- Add graceful shutdown with signal handling and drain timeout.
+- Replace `http.Error` strings with structured JSON error responses.
+- Add cursor pagination to all list endpoints.
+- Initialize OpenTelemetry with OTLP exporter, auto-instrument HTTP and pgx.
+- Add trace-correlated structured logging via `log/slog`.
+- Wrap migrations with `pg_advisory_lock` for multi-instance safety.
+- Add request timeout middleware (30s default, 10m for SSE).
+- Eliminate N+1 queries with batch loading.
+- Add rate limiting on expensive endpoints (task creation, file upload).
+
+Read `references/performance-production.md` for implementation details and code templates.
+
+### 9. Verify the slice end to end
 
 - Validate the OpenAPI line count.
 - Regenerate Go and TypeScript code.
@@ -178,6 +203,9 @@ Use `assets/docker-compose.template.yaml` as the starting point when scaffolding
 ## Resource Map
 
 - Read `references/architecture-blueprint.md` for the default DDD folder layout, request flow, SSE patterns, and async task processing.
+- Read `references/performance-production.md` for connection pool tuning, graceful shutdown, pagination, observability (OTel + ClickHouse), caching, rate limiting, and N+1 prevention.
+- Read `references/backend-middleware-database.md` for auth middleware, middleware chain ordering, DB indexing, transactions, partitioning, circuit breakers, worker queues, and query builders.
+- Read `references/frontend-aesthetics-dataviz.md` for motion design, data-dense tables, chart libraries (ECharts/Recharts), dark mode, CJK typography, heat maps, and export patterns.
 - Read `references/openapi-codegen-playbook.md` for contract rules, code generation commands, and placement rules.
 - Read `references/frontend-design-playbook.md` for the required frontend skill chain, premium UI standards, runtime proxy pattern, SSE consumption, and shadcn pitfalls.
 - Run `scripts/check_openapi_size.py` to enforce the OpenAPI file limit.
