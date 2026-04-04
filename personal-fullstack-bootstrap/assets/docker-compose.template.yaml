@@ -19,12 +19,17 @@ services:
   api:
     build:
       context: ./apps/api
+      # For Chinese network environments, uncomment:
+      # args:
+      #   GOPROXY: "https://goproxy.cn,direct"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://app:app@postgres:5432/app?sslmode=disable
-      PORT: 8080
+      # IMPORTANT: Hardcode values as explicit strings.
+      # ${VAR} syntax is silently overridden by the host shell environment.
+      DATABASE_URL: "postgres://app:app@postgres:5432/app?sslmode=disable"
+      PORT: "8080"
     ports:
       - "8080:8080"
 
@@ -34,8 +39,9 @@ services:
     depends_on:
       - api
     environment:
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
-      INTERNAL_API_BASE_URL: http://api:8080
+      # Read at RUNTIME by src/app/api/[[...path]]/route.ts proxy.
+      # NOT used by Next.js rewrites (which would bake it at build time).
+      INTERNAL_API_BASE_URL: "http://api:8080"
     ports:
       - "3000:3000"
 

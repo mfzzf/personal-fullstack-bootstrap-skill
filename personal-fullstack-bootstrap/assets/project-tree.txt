@@ -17,10 +17,17 @@
 │   │   └── Makefile
 │   └── web/
 │       ├── src/app/
+│       │   └── api/[[...path]]/route.ts      ← runtime API proxy (mandatory)
 │       ├── src/components/
+│       │   ├── ui/                           ← shadcn/ui primitives
+│       │   └── agent/                        ← SSE progress components (if needed)
 │       ├── src/features/
-│       ├── src/lib/api/generated/
+│       ├── src/lib/api/
+│       │   ├── generated/
+│       │   └── client.ts
+│       ├── src/hooks/
 │       ├── src/styles/
+│       ├── next.config.js                    ← just { output: "standalone" }
 │       ├── Dockerfile
 │       ├── package.json
 │       └── components.json
